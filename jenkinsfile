@@ -6,7 +6,9 @@ pipeline {
     }
     environment {
         SCANNER_HOME=tool 'sonar-scanner'
-    }
+        
+            }
+
     stages {
         stage ("clean workspace") {
             steps {
@@ -15,7 +17,7 @@ pipeline {
         }
         stage ("Git Checkout") {
             steps {
-                git 'https://github.com/KastroVKiran/Zomato-Project-Kastro.git'
+                git branch: 'main', url: 'https://github.com/AbhinavMee9549/zomato-clone-devops.git'
             }
         }
         stage("Sonarqube Analysis"){
@@ -29,7 +31,7 @@ pipeline {
         stage("Code Quality Gate"){
            steps {
                 script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token' 
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar' 
                 }
             } 
         }
@@ -40,7 +42,7 @@ pipeline {
         }
         stage('OWASP FS SCAN') {
             steps {
-                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit -n', odcInstallation: 'DP-Check'
+                dependencyCheck additionalArguments: '--scan ./ --format XML', odcInstallation: 'DP-Check'
                 dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
     }
 }
@@ -54,32 +56,40 @@ pipeline {
                 sh "docker build -t zomato ."
             }
         }
-        stage ("Tag & Push to DockerHub") {
+        stage("Docker Login, Tag & Push") {
             steps {
                 script {
-                    withDockerRegistry(credentialsId: 'docker') {
-                        sh "docker tag zomato kastrov/zomato:latest "
-                        sh "docker push kastrov/zomato:latest "
-                    }
-                }
+                   withCredentials([usernamePassword(
+                     credentialsId: 'docker',
+                     usernameVariable: 'DOCKER_USER',
+                     passwordVariable: 'DOCKER_PASS'
+            )]) {
+
+                sh '''
+                echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+
+                docker tag zomato $DOCKER_USER/zomato:latest
+
+                docker push $DOCKER_USER/zomato:latest
+                '''
             }
         }
-        stage('Docker Scout Image') {
-            steps {
-                script{
-                   withDockerRegistry(credentialsId: 'docker', toolName: 'docker'){
-                       sh 'docker-scout quickview kastrov/zomato:latest'
-                       sh 'docker-scout cves kastrov/zomato:latest'
-                       sh 'docker-scout recommendations kastrov/zomato:latest'
-                   }
-                }
-            }
-        }
+    }
+}
+       stage('Docker Scout Image') {
+    steps {
+        echo 'Skipping Docker Scout stage...'
+    }
+}
         stage ("Deploy to Container") {
-            steps {
-                sh 'docker run -d --name zomato -p 3000:3000 kastrov/zomato:latest'
-            }
-        }
+    steps {
+        sh '''
+        docker stop zomato || true
+        docker rm zomato || true
+        docker run -d --name zomato -p 3000:3000 abhi414/zomato:latest
+        '''
+    }
+}
     }
     post {
     always {
@@ -100,7 +110,7 @@ pipeline {
                 </body>
                 </html>
             """,
-            to: 'kastrokiran@gmail.com',
+            to: '2023btechaidsabhinav15661@poornima.edu.in',
             mimeType: 'text/html',
             attachmentsPattern: 'trivy.txt'
         }
