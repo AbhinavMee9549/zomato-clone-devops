@@ -1,8 +1,6 @@
-DevOps Project - Dr. Kastro Kiran
+DevOps Project - Steps
 Deployment of ZOMATO Project
 --------------------------------------------
-Repo URL: https://github.com/KastroVKiran/DevOps-Project-Zomato-Kastro.git
-
 
 1. Launch an Instance (Ubuntu, 24.04, t2.large, 30 GB)
 
@@ -74,40 +72,29 @@ Verifiy Trivy installation: trivy --version
 
 8. Install Docker Scout
 Make sure to Login to DockerHub account in browser
-<Follow the process as explained in the video>
 
 9. Install SonarQube using Docker
 $ docker run -d --name sonar -p 9000:9000 sonarqube:lts-community
 $ docker ps (You can see SonarQube container)
 
-<Follow the process as explained in the video>
 
 10. Installation of Plugins in Jenkins
-Install below plugins:
-<Follow the process as explained in the video>
 
 11. SonarQube configuration in Jenkins
-<Follow the process as explained in the video>
 
 11.1. Tools Configuration in Jenkins
-<Follow the process as explained in the video>
 
 11.2. Configuration of SonarQube Token in Jenkins
-<Follow the process as explained in the video>
 
 Lets create another credentials for DockerHub. This is being done because, as soon as the docker image is created, it should get pushed to dockerhub. 
-<Follow the process as explained in the video>
 
 11.3 Configuration of Email notification in Jenkins
 As soon as the build happens, i need to get an email notification to do that we have to configure our email.
-<Follow the process as explained in the video>
 
 
 12. System Configuration in Jenkins
-<Follow the process as explained in the video>
 
 13. Create webhook in SonarQube
-<Follow the process as explained in the video>
 
 14. Create Pipeline Job
 Before pasting the pipeline script, do the following changes in the script
@@ -125,7 +112,9 @@ pipeline {
     }
     environment {
         SCANNER_HOME=tool 'sonar-scanner'
-    }
+        
+            }
+
     stages {
         stage ("clean workspace") {
             steps {
@@ -134,7 +123,7 @@ pipeline {
         }
         stage ("Git Checkout") {
             steps {
-                git 'https://github.com/KastroVKiran/Zomato-Project-Kastro.git'
+                git branch: 'main', url: 'https://github.com/AbhinavMee9549/zomato-clone-devops.git'
             }
         }
         stage("Sonarqube Analysis"){
@@ -148,7 +137,7 @@ pipeline {
         stage("Code Quality Gate"){
            steps {
                 script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token' 
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar' 
                 }
             } 
         }
@@ -159,7 +148,7 @@ pipeline {
         }
         stage('OWASP FS SCAN') {
             steps {
-                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit -n', odcInstallation: 'DP-Check'
+                dependencyCheck additionalArguments: '--scan ./ --format XML', odcInstallation: 'DP-Check'
                 dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
     }
 }
@@ -173,32 +162,40 @@ pipeline {
                 sh "docker build -t zomato ."
             }
         }
-        stage ("Tag & Push to DockerHub") {
+        stage("Docker Login, Tag & Push") {
             steps {
                 script {
-                    withDockerRegistry(credentialsId: 'docker') {
-                        sh "docker tag zomato kastrov/zomato:latest "
-                        sh "docker push kastrov/zomato:latest "
-                    }
-                }
+                   withCredentials([usernamePassword(
+                     credentialsId: 'docker',
+                     usernameVariable: 'DOCKER_USER',
+                     passwordVariable: 'DOCKER_PASS'
+            )]) {
+
+                sh '''
+                echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+
+                docker tag zomato $DOCKER_USER/zomato:latest
+
+                docker push $DOCKER_USER/zomato:latest
+                '''
             }
         }
-        stage('Docker Scout Image') {
-            steps {
-                script{
-                   withDockerRegistry(credentialsId: 'docker', toolName: 'docker'){
-                       sh 'docker-scout quickview kastrov/zomato:latest'
-                       sh 'docker-scout cves kastrov/zomato:latest'
-                       sh 'docker-scout recommendations kastrov/zomato:latest'
-                   }
-                }
-            }
-        }
+    }
+}
+       stage('Docker Scout Image') {
+    steps {
+        echo 'Skipping Docker Scout stage...'
+    }
+}
         stage ("Deploy to Container") {
-            steps {
-                sh 'docker run -d --name zomato -p 3000:3000 kastrov/zomato:latest'
-            }
-        }
+    steps {
+        sh '''
+        docker stop zomato || true
+        docker rm zomato || true
+        docker run -d --name zomato -p 3000:3000 abhi414/zomato:latest
+        '''
+    }
+}
     }
     post {
     always {
@@ -219,7 +216,7 @@ pipeline {
                 </body>
                 </html>
             """,
-            to: 'kastrokiran@gmail.com',
+            to: '2023btechaidsabhinav15661@poornima.edu.in',
             mimeType: 'text/html',
             attachmentsPattern: 'trivy.txt'
         }
@@ -707,12 +704,5 @@ Copy the public ip of "nodeIP" which we have done exactly 4 steps above this lin
 Note: If you see error in Prometheus under "k8s", open port number 9100 for the EC2 instances which were created as part of EKS cluster i.e nodes
 
 After everything is done. Delete everything. Make sure to delete the Cloud Formation Stacks.
-
-========================================================================================================
-Kind Request:
-Once after you have successfully deployed the App, kindly share your experience on LinkedIn by Tagging me and also provide the YouTube link of this project in your post, as it helps others to access the video quickly. 
-========================================================================================================
-												HAPPY LEARNING
-
 
 
